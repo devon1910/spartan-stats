@@ -77,7 +77,7 @@ export default function LogPage() {
           )}
 
           {selectedDate && !loadingSession && players.length === 0 && (
-            <p className="text-zinc-600 text-sm text-center">Add players to continue</p>
+            <p className="text-zinc-600 text-sm text-center">Add players to continue..</p>
           )}
         </>
       )}
