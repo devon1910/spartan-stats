@@ -7,13 +7,17 @@ interface PlayerInputProps {
   onConfirm: (players: string[]) => void;
 }
 
+// Invisible Unicode chars WhatsApp injects: soft-hyphen, zero-width spaces, word joiners, BOM
+const INVISIBLE_CHARS = /[­​‌‍⁠⁡⁢⁣⁤﻿]/g;
+
 export default function PlayerInput({ onConfirm }: PlayerInputProps) {
   const [text, setText] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
   function parsePlayers(input: string): string[] {
-    const matches = [...input.matchAll(/\d+\.\s*([A-Za-z]+)/g)];
-    return matches.map((m) => m[1]);
+    const cleaned = input.replace(INVISIBLE_CHARS, '');
+    const matches = [...cleaned.matchAll(/^\d+\.\s*(.+)$/gm)];
+    return matches.map((m) => m[1].trim()).filter(Boolean);
   }
 
   const parsed = parsePlayers(text);
@@ -41,7 +45,7 @@ export default function PlayerInput({ onConfirm }: PlayerInputProps) {
           <textarea
             className="w-full bg-zinc-800 text-white rounded-xl p-3 text-sm placeholder-zinc-600 border border-zinc-700 focus:border-rose-500 focus:outline-none resize-none transition"
             rows={4}
-            placeholder="Paste your list e.g. 1. Devon 2. Sean 3. Tunde..."
+            placeholder={"Paste your list e.g.\n1. Devon\n2. Sean\n3. Tunde"}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
