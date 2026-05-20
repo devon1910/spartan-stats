@@ -69,11 +69,17 @@ export default function LogPage() {
         </div>
       ) : (
         <>
-          <PlayerInput
-            key={inputKey}
-            initialPlayers={players}
-            onConfirm={setPlayers}
-          />
+          {!selectedDate && (
+            <p className="text-zinc-600 text-sm text-center">Select a Tuesday to log stats</p>
+          )}
+
+          {selectedDate && (
+            <PlayerInput
+              key={inputKey}
+              initialPlayers={players}
+              onConfirm={setPlayers}
+            />
+          )}
 
           {selectedDate && players.length > 0 && (
             <SessionForm
@@ -83,11 +89,7 @@ export default function LogPage() {
             />
           )}
 
-          {!selectedDate && (
-            <p className="text-zinc-600 text-sm text-center">Select a Tuesday to log stats</p>
-          )}
-
-          {selectedDate && !loadingSession && players.length === 0 && (
+          {selectedDate && players.length === 0 && (
             <p className="text-zinc-600 text-sm text-center">Add players to continue..</p>
           )}
         </>
