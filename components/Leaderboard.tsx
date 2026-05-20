@@ -52,9 +52,11 @@ export default function Leaderboard() {
       aggregated[name].sessions += 1;
     }
 
-    const sorted = Object.values(aggregated).sort(
-      (a, b) => b.goals + b.assists - (a.goals + a.assists)
-    );
+    const sorted = Object.values(aggregated).sort((a, b) => {
+      const ptsDiff = (b.goals + b.assists) - (a.goals + a.assists);
+      if (ptsDiff !== 0) return ptsDiff;
+      return b.goals - a.goals;
+    });
     setData(sorted);
     setLoading(false);
   }
