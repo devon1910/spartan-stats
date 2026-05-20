@@ -6,7 +6,9 @@ import { useState, useCallback } from 'react';
 import TuesdayCalendar from '@/components/TuesdayCalendar';
 import PlayerInput from '@/components/PlayerInput';
 import SessionForm from '@/components/SessionForm';
+import Toast from '@/components/Toast';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/lib/useToast';
 import { Loader2 } from 'lucide-react';
 
 export default function LogPage() {
@@ -15,6 +17,7 @@ export default function LogPage() {
   const [loadingSession, setLoadingSession] = useState(false);
   // key used to reset PlayerInput when a new date is picked
   const [inputKey, setInputKey] = useState(0);
+  const { toast, showToast } = useToast();
 
   const handleSelectDate = useCallback(async (date: string) => {
     setSelectedDate(date);
@@ -23,17 +26,21 @@ export default function LogPage() {
     setLoadingSession(true);
 
     try {
-      const { data: sessionData } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select('id')
         .eq('session_date', date)
-        .single();
+        .maybeSingle();
+
+      if (sessionError) throw sessionError;
 
       if (sessionData) {
-        const { data: statsRows } = await supabase
+        const { data: statsRows, error: statsError } = await supabase
           .from('stats')
           .select('players(name)')
           .eq('session_id', sessionData.id);
+
+        if (statsError) throw statsError;
 
         if (statsRows && statsRows.length > 0) {
           const names = statsRows
@@ -42,13 +49,17 @@ export default function LogPage() {
           setPlayers(names);
         }
       }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to load session — try again', false);
     } finally {
       setLoadingSession(false);
     }
-  }, []);
+  }, [showToast]);
 
   return (
     <div className="flex flex-col gap-5">
+      <Toast toast={toast} />
       <TuesdayCalendar onSelectDate={handleSelectDate} selectedDate={selectedDate} />
 
       {loadingSession ? (

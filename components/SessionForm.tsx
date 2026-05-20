@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BarChart2, Save, Check, AlertCircle, Plus, Minus } from 'lucide-react';
+import { useToast } from '@/lib/useToast';
+import Toast from '@/components/Toast';
+import { BarChart2, Save, Plus, Minus } from 'lucide-react';
 
 interface SessionFormProps {
   players: string[];
@@ -21,7 +23,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
     players.map((name) => ({ name, goals: 0, assists: 0 }))
   );
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const { toast, showToast } = useToast();
 
   useEffect(() => {
     setStats(players.map((name) => ({ name, goals: 0, assists: 0 })));
@@ -33,7 +35,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
       .from('sessions')
       .select('id')
       .eq('session_date', sessionDate)
-      .single();
+      .maybeSingle();
 
     if (!sessionData) return;
 
@@ -101,13 +103,11 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
         );
       }
 
-      setToast({ msg: 'Session saved!', ok: true });
-      setTimeout(() => setToast(null), 3000);
+      showToast('Session saved!', true);
       onSave();
     } catch (err) {
       console.error(err);
-      setToast({ msg: 'Error saving — check console', ok: false });
-      setTimeout(() => setToast(null), 4000);
+      showToast('Error saving — try again', false);
     } finally {
       setSaving(false);
     }
@@ -180,16 +180,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
         {saving ? 'Saving...' : 'Save Session'}
       </button>
 
-      {toast && (
-        <div
-          className={`mt-3 flex items-center justify-center gap-1.5 text-sm font-medium ${
-            toast.ok ? 'text-emerald-400' : 'text-rose-400'
-          }`}
-        >
-          {toast.ok ? <Check size={14} /> : <AlertCircle size={14} />}
-          {toast.msg}
-        </div>
-      )}
+      <Toast toast={toast} />
     </div>
   );
 }
