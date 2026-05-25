@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Target, Sparkles, CalendarCheck, TrendingUp, Share2 } from 'lucide-react';
 
 interface PlayerStat {
-  id: number;
+  id: string;
   name: string;
   goals: number;
   assists: number;

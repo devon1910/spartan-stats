@@ -8,7 +8,7 @@ import FormGuide from '@/components/FormGuide';
 
 interface StatRow { goals: number; assists: number; session_date: string }
 
-export default function PlayerProfile({ playerId }: { playerId: number }) {
+export default function PlayerProfile({ playerId }: { playerId: string }) {
   const [scope, setScope] = useState<'month' | 'alltime'>('alltime');
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');

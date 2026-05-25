@@ -9,7 +9,7 @@ import MonthlyMVPCard from '@/components/MonthlyMVPCard';
 import MatchDayFacts from '@/components/MatchDayFacts';
 
 interface PlayerStat {
-  id: number;
+  id: string;
   name: string;
   goals: number;
   assists: number;
@@ -49,9 +49,9 @@ export default function Leaderboard() {
       return;
     }
 
-    type Row = { goals: number; assists: number; players: { id: number; name: string } | null; sessions: { session_date: string } | null };
+    type Row = { goals: number; assists: number; players: { id: string; name: string } | null; sessions: { session_date: string } | null };
     const valid = (rows as unknown as Row[]).filter(
-      (r) => r.players?.id != null && r.players?.name && r.sessions?.session_date
+      (r) => r.players?.id && r.players?.name && r.sessions?.session_date
     );
 
     // latest up-to-5 session dates across the whole dataset — shared across rows so
