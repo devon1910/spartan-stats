@@ -120,18 +120,15 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
 
       const playerMap = Object.fromEntries(playerRows.map((p) => [p.name, p.id]));
 
-      // dual-write: stats (count cache) + goal_events (source of truth)
-      for (const name of players) {
-        const playerId = playerMap[name];
-        if (!playerId) continue;
-        const t = totals[name];
-        await supabase.from('stats').upsert(
-          { session_id: sessionData.id, player_id: playerId, goals: t.goals, assists: t.assists },
-          { onConflict: 'session_id,player_id' }
-        );
-      }
-
-      await supabase.from('goal_events').delete().eq('session_id', sessionData.id);
+      // Replace only scorer-bearing events for this session — preserves any
+      // legacy assist-only events from the backfill so historical assist
+      // counts aren't dropped.
+      const { error: deleteError } = await supabase
+        .from('goal_events')
+        .delete()
+        .eq('session_id', sessionData.id)
+        .not('scorer_id', 'is', null);
+      if (deleteError) throw deleteError;
 
       if (goals.length > 0) {
         const events = goals
@@ -147,9 +144,38 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
         }
       }
 
+      // Derive stats from the full goal_events set (managed + preserved legacy)
+      // and upsert only for players in the current roster — orphan stats rows
+      // belonging to players the user removed from the roster are left alone.
+      const { data: allEvents } = await supabase
+        .from('goal_events')
+        .select('scorer_id, assister_id')
+        .eq('session_id', sessionData.id);
+
+      const derivedByPlayerId: Record<string, { goals: number; assists: number }> = {};
+      for (const e of (allEvents ?? []) as any[]) {
+        if (e.scorer_id) {
+          (derivedByPlayerId[e.scorer_id] ||= { goals: 0, assists: 0 }).goals++;
+        }
+        if (e.assister_id) {
+          (derivedByPlayerId[e.assister_id] ||= { goals: 0, assists: 0 }).assists++;
+        }
+      }
+
+      for (const name of players) {
+        const playerId = playerMap[name];
+        if (!playerId) continue;
+        const t = derivedByPlayerId[playerId] ?? { goals: 0, assists: 0 };
+        await supabase.from('stats').upsert(
+          { session_id: sessionData.id, player_id: playerId, goals: t.goals, assists: t.assists },
+          { onConflict: 'session_id,player_id' }
+        );
+      }
+
       showToast('Session saved!', true);
-      setLegacyAssists(0);
       onSave();
+      // refresh legacy banner state in case anything changed
+      prefillExisting();
     } catch (err) {
       console.error(err);
       showToast('Error saving — try again', false);
@@ -174,8 +200,8 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
         <div className="mb-4 flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs rounded-xl px-3 py-2">
           <AlertTriangle size={14} className="shrink-0 mt-0.5" />
           <span>
-            This session has {legacyAssists} unlinked assist{legacyAssists === 1 ? '' : 's'} from old
-            data. Saving will drop {legacyAssists === 1 ? 'it' : 'them'} — re-add as goals to keep.
+            Preserving {legacyAssists} legacy assist{legacyAssists === 1 ? '' : 's'} from old data.
+            Not editable here, but still counted in this session's totals.
           </span>
         </div>
       )}
