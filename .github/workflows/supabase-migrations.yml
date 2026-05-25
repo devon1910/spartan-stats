@@ -10,10 +10,19 @@ name: Apply Supabase migrations
 # superuser connection instead.
 #
 # Required repository secret (Settings → Secrets and variables → Actions):
-#   SUPABASE_DB_URL  — full Postgres connection string for your project.
+#   SUPABASE_DB_URL  — Session pooler connection string for your project.
 #                      Copy from Supabase Dashboard → Project Settings →
-#                      Database → Connection string → URI. Looks like:
-#                      postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres
+#                      Database → Connection string → "Session pooler" tab.
+#                      Looks like:
+#                      postgresql://postgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
+#
+#                      Do NOT use the "Direct connection" — Supabase no
+#                      longer offers IPv4 on it, and GitHub-hosted runners
+#                      are IPv4-only.
+#                      Do NOT use the "Transaction pooler" (port 6543) —
+#                      `supabase db push` takes a pg_advisory_lock, which
+#                      PgBouncer transaction mode rejects.
+#
 #                      If your password contains special characters they
 #                      must be percent-encoded.
 
