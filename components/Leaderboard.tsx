@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Share2, Loader2 } from 'lucide-react';
 import FormGuide from '@/components/FormGuide';
+import MonthlyMVPCard from '@/components/MonthlyMVPCard';
 
 interface PlayerStat {
   id: number;
@@ -168,6 +169,13 @@ export default function Leaderboard() {
         <p className="text-zinc-600 text-center py-16 text-sm">No stats logged yet for this period.</p>
       ) : (
         <>
+          {filter === 'month' && (() => {
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            const monthLabel = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+            return <MonthlyMVPCard current={data} monthLabel={monthLabel} monthStart={monthStart} />;
+          })()}
+
           {data.length >= 3 && (
             <div className="grid grid-cols-3 gap-2 mb-5">
               {([data[1], data[0], data[2]] as const).map((player, podiumIdx) => {
