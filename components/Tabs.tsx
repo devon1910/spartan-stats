@@ -17,7 +17,10 @@ export default function Tabs() {
       <div className="max-w-2xl mx-auto px-3 sm:px-4">
         <div className="flex">
           {tabs.map(({ href, label, Icon }) => {
-            const active = pathname === href || (pathname === '/' && href === '/log');
+            const active =
+              pathname === href ||
+              (pathname === '/' && href === '/log') ||
+              (pathname.startsWith('/players') && href === '/leaderboard');
             return (
               <Link
                 key={href}

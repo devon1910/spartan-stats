@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Share2, Loader2 } from 'lucide-react';
 import FormGuide from '@/components/FormGuide';
 
 interface PlayerStat {
+  id: number;
   name: string;
   goals: number;
   assists: number;
@@ -28,7 +30,7 @@ export default function Leaderboard() {
 
   async function fetchStats() {
     setLoading(true);
-    let query = supabase.from('stats').select('goals, assists, players(name), sessions(session_date)');
+    let query = supabase.from('stats').select('goals, assists, players(id, name), sessions(session_date)');
 
     if (filter === 'month') {
       const now = new Date();
@@ -45,9 +47,9 @@ export default function Leaderboard() {
       return;
     }
 
-    type Row = { goals: number; assists: number; players: { name: string } | null; sessions: { session_date: string } | null };
+    type Row = { goals: number; assists: number; players: { id: number; name: string } | null; sessions: { session_date: string } | null };
     const valid = (rows as unknown as Row[]).filter(
-      (r) => r.players?.name && r.sessions?.session_date
+      (r) => r.players?.id != null && r.players?.name && r.sessions?.session_date
     );
 
     // latest up-to-5 session dates across the whole dataset — shared across rows so
@@ -61,10 +63,11 @@ export default function Leaderboard() {
     const perPlayerByDate: Record<string, Record<string, number>> = {};
 
     for (const row of valid) {
+      const id = row.players!.id;
       const name = row.players!.name;
       const date = row.sessions!.session_date;
       if (!aggregated[name]) {
-        aggregated[name] = { name, goals: 0, assists: 0, sessions: 0, form: [] };
+        aggregated[name] = { id, name, goals: 0, assists: 0, sessions: 0, form: [] };
         perPlayerByDate[name] = {};
       }
       aggregated[name].goals += row.goals;
@@ -173,7 +176,11 @@ export default function Leaderboard() {
                 const barH = ['h-16', 'h-24', 'h-12'];
                 const barColor = ['bg-zinc-700', 'bg-rose-500', 'bg-zinc-800'];
                 return (
-                  <div key={player.name} className="flex flex-col items-center">
+                  <Link
+                    key={player.name}
+                    href={`/players/${player.id}`}
+                    className="flex flex-col items-center hover:opacity-80 transition"
+                  >
                     <span className="text-xl mb-0.5">{RANK_ICONS[rankIdx]}</span>
                     <span className="text-white text-xs font-bold text-center truncate w-full px-1 text-center">
                       {player.name}
@@ -182,7 +189,7 @@ export default function Leaderboard() {
                       {player.goals + player.assists} pts
                     </span>
                     <div className={`w-full ${barH[podiumIdx]} ${barColor[podiumIdx]} rounded-t-lg`} />
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -214,7 +221,11 @@ export default function Leaderboard() {
                         <span className="text-zinc-600 text-xs">{i + 1}</span>
                       )}
                     </td>
-                    <td className="px-2 py-3 text-white font-medium">{row.name}</td>
+                    <td className="px-2 py-3 text-white font-medium">
+                      <Link href={`/players/${row.id}`} className="hover:text-rose-400 transition">
+                        {row.name}
+                      </Link>
+                    </td>
                     <td className="px-2 py-3 text-center text-rose-400 font-semibold">{row.goals}</td>
                     <td className="px-2 py-3 text-center text-zinc-400 font-semibold">{row.assists}</td>
                     <td className="px-2 py-3 text-center text-white font-bold">{row.goals + row.assists}</td>
