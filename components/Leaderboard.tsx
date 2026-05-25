@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { Share2, Loader2 } from 'lucide-react';
 import FormGuide from '@/components/FormGuide';
 import MonthlyMVPCard from '@/components/MonthlyMVPCard';
+import MatchDayFacts from '@/components/MatchDayFacts';
 
 interface PlayerStat {
   id: number;
@@ -260,6 +261,25 @@ export default function Leaderboard() {
             <Share2 size={15} />
             {copied ? 'Copied! Paste into WhatsApp' : 'Share to WhatsApp'}
           </button>
+
+          <div className="mt-2">
+            {(() => {
+              const now = new Date();
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+              const scopeLabel = filter === 'month'
+                ? now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+                : 'All Time';
+              return (
+                <MatchDayFacts
+                  filter={filter}
+                  scopeLabel={scopeLabel}
+                  monthStart={filter === 'month' ? monthStart : null}
+                  monthEnd={filter === 'month' ? monthEnd : null}
+                />
+              );
+            })()}
+          </div>
         </>
       )}
     </div>
