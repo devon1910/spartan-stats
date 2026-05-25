@@ -2,6 +2,8 @@
 
 Mobile-first stats tracker for the weekly Tuesday football kickabout. Log goals and assists during the game, watch the leaderboard, dig into player profiles, and one-tap a polished summary into the group chat.
 
+**Live:** [spartan-stats.vercel.app](https://spartan-stats.vercel.app/)
+
 ## Features
 
 - **Goal-by-goal logging** — capture each goal with optional assister; per-player totals derive automatically
