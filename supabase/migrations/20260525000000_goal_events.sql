@@ -5,9 +5,9 @@
 
 CREATE TABLE IF NOT EXISTS goal_events (
   id          BIGSERIAL PRIMARY KEY,
-  session_id  BIGINT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  scorer_id   BIGINT REFERENCES players(id),
-  assister_id BIGINT REFERENCES players(id),
+  session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  scorer_id   UUID REFERENCES players(id),
+  assister_id UUID REFERENCES players(id),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT goal_events_has_actor CHECK (scorer_id IS NOT NULL OR assister_id IS NOT NULL),
   CONSTRAINT goal_events_distinct_actors CHECK (scorer_id IS NULL OR assister_id IS NULL OR scorer_id <> assister_id)
