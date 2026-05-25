@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Share2, Loader2 } from 'lucide-react';
+import FormGuide from '@/components/FormGuide';
 
 interface PlayerStat {
   name: string;
   goals: number;
   assists: number;
   sessions: number;
+  // newest first, aligned to the latest up-to-5 session dates across the dataset;
+  // null entries mean the player wasn't in that session
+  form: ({ pts: number } | null)[];
 }
 
 const RANK_ICONS = ['🥇', '🥈', '🥉'];
@@ -41,15 +45,38 @@ export default function Leaderboard() {
       return;
     }
 
+    type Row = { goals: number; assists: number; players: { name: string } | null; sessions: { session_date: string } | null };
+    const valid = (rows as unknown as Row[]).filter(
+      (r) => r.players?.name && r.sessions?.session_date
+    );
+
+    // latest up-to-5 session dates across the whole dataset — shared across rows so
+    // chips align by date and a missing date renders as "didn't play"
+    const allDates = Array.from(
+      new Set(valid.map((r) => r.sessions!.session_date).filter(Boolean))
+    ).sort((a, b) => (a < b ? 1 : -1));
+    const formDates = allDates.slice(0, 5);
+
     const aggregated: Record<string, PlayerStat> = {};
-    for (const row of rows) {
-      const name = (row.players as any)?.name;
-      const sessionDate = (row.sessions as any)?.session_date;
-      if (!name || (filter === 'month' && !sessionDate)) continue;
-      if (!aggregated[name]) aggregated[name] = { name, goals: 0, assists: 0, sessions: 0 };
+    const perPlayerByDate: Record<string, Record<string, number>> = {};
+
+    for (const row of valid) {
+      const name = row.players!.name;
+      const date = row.sessions!.session_date;
+      if (!aggregated[name]) {
+        aggregated[name] = { name, goals: 0, assists: 0, sessions: 0, form: [] };
+        perPlayerByDate[name] = {};
+      }
       aggregated[name].goals += row.goals;
       aggregated[name].assists += row.assists;
       aggregated[name].sessions += 1;
+      perPlayerByDate[name][date] = (perPlayerByDate[name][date] ?? 0) + row.goals + row.assists;
+    }
+
+    for (const name of Object.keys(aggregated)) {
+      aggregated[name].form = formDates.map((d) =>
+        d in perPlayerByDate[name] ? { pts: perPlayerByDate[name][d] } : null
+      );
     }
 
     const sorted = Object.values(aggregated).sort((a, b) => {
@@ -171,6 +198,7 @@ export default function Leaderboard() {
                   <th className="text-center px-2 py-3 font-medium">🅰️</th>
                   <th className="text-center px-2 py-3 font-medium">Pts</th>
                   <th className="text-center px-2 py-3 font-medium hidden sm:table-cell">Games</th>
+                  <th className="text-center px-2 py-3 font-medium hidden sm:table-cell">Form</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,6 +219,11 @@ export default function Leaderboard() {
                     <td className="px-2 py-3 text-center text-zinc-400 font-semibold">{row.assists}</td>
                     <td className="px-2 py-3 text-center text-white font-bold">{row.goals + row.assists}</td>
                     <td className="px-2 py-3 text-center text-zinc-600 hidden sm:table-cell">{row.sessions}</td>
+                    <td className="px-2 py-3 hidden sm:table-cell">
+                      <div className="flex justify-center">
+                        <FormGuide entries={row.form} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
