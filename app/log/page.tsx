@@ -37,15 +37,18 @@ export default function LogPage() {
       if (sessionData) {
         const { data: statsRows, error: statsError } = await supabase
           .from('stats')
-          .select('players(name)')
+          .select('players(name, is_goalkeeper)')
           .eq('session_id', sessionData.id);
 
         if (statsError) throw statsError;
 
         if (statsRows && statsRows.length > 0) {
+          // Keepers are managed in their own section of the form, not the
+          // outfield roster — keep them out of the player list.
           const names = statsRows
-            .map((r: any) => r.players?.name)
-            .filter(Boolean) as string[];
+            .map((r: any) => r.players)
+            .filter((p: any) => p?.name && !p.is_goalkeeper)
+            .map((p: any) => p.name) as string[];
           setPlayers(names);
         }
       }

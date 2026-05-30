@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/lib/useToast';
 import Toast from '@/components/Toast';
-import { BarChart2, Save, Plus, X, AlertTriangle } from 'lucide-react';
+import { BarChart2, Save, Plus, X, AlertTriangle, Minus } from 'lucide-react';
 
 interface SessionFormProps {
   players: string[];
@@ -17,17 +17,38 @@ interface GoalEntry {
   assister: string | null;
 }
 
+interface Keeper {
+  id: string;
+  name: string;
+}
+
 const NONE = '__none__';
 
 export default function SessionForm({ players, sessionDate, onSave }: SessionFormProps) {
   const [goals, setGoals] = useState<GoalEntry[]>([]);
   const [legacyAssists, setLegacyAssists] = useState(0);
+  const [keepers, setKeepers] = useState<Keeper[]>([]);
+  // goals conceded this session, keyed by keeper id
+  const [conceded, setConceded] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const { toast, showToast } = useToast();
+
+  // Keepers are fixed, so fetch them once — independent of the outfield roster.
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('players')
+        .select('id, name')
+        .eq('is_goalkeeper', true)
+        .order('name');
+      setKeepers((data ?? []) as Keeper[]);
+    })();
+  }, []);
 
   useEffect(() => {
     setGoals([]);
     setLegacyAssists(0);
+    setConceded({});
     prefillExisting();
   }, [players, sessionDate]);
 
@@ -39,6 +60,17 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
       .maybeSingle();
 
     if (!sessionData) return;
+
+    // Keeper concessions live on the stats row (goals_conceded), keyed by player.
+    const { data: keeperStats } = await supabase
+      .from('stats')
+      .select('player_id, goals_conceded')
+      .eq('session_id', sessionData.id);
+    const c: Record<string, number> = {};
+    for (const r of (keeperStats ?? []) as any[]) {
+      if (r.goals_conceded) c[r.player_id] = r.goals_conceded;
+    }
+    setConceded(c);
 
     const { data: events } = await supabase
       .from('goal_events')
@@ -94,6 +126,13 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
 
   function removeGoal(index: number) {
     setGoals((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function bumpConceded(keeperId: string, delta: number) {
+    setConceded((prev) => ({
+      ...prev,
+      [keeperId]: Math.max(0, (prev[keeperId] ?? 0) + delta),
+    }));
   }
 
   async function handleSave() {
@@ -168,6 +207,20 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
         const t = derivedByPlayerId[playerId] ?? { goals: 0, assists: 0 };
         await supabase.from('stats').upsert(
           { session_id: sessionData.id, player_id: playerId, goals: t.goals, assists: t.assists },
+          { onConflict: 'session_id,player_id' }
+        );
+      }
+
+      // Keepers: persist goals conceded on their own stats row (goals/assists 0).
+      for (const k of keepers) {
+        await supabase.from('stats').upsert(
+          {
+            session_id: sessionData.id,
+            player_id: k.id,
+            goals: 0,
+            assists: 0,
+            goals_conceded: conceded[k.id] ?? 0,
+          },
           { onConflict: 'session_id,player_id' }
         );
       }
@@ -293,6 +346,54 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
         <Plus size={14} />
         Add goal
       </button>
+
+      {keepers.length > 0 && (
+        <div className="mt-5">
+          <p className="text-zinc-600 text-[11px] font-medium mb-2 px-1 flex items-center gap-1.5">
+            <span className="text-sm">🧤</span> Goals Conceded
+          </p>
+          <div className="space-y-1.5">
+            {keepers.map((k) => {
+              const v = conceded[k.id] ?? 0;
+              const clean = v === 0;
+              return (
+                <div
+                  key={k.id}
+                  className="bg-zinc-800 rounded-xl px-2.5 sm:px-3 py-2 flex items-center gap-2"
+                >
+                  <span className="text-base shrink-0">🧤</span>
+                  <span className="flex-1 min-w-0 text-white text-sm font-medium truncate">
+                    {k.name}
+                    {clean && (
+                      <span className="ml-2 text-emerald-400 text-[10px] font-semibold uppercase tracking-wide">
+                        Clean sheet
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={() => bumpConceded(k.id, -1)}
+                    disabled={v === 0}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-700/50 hover:bg-zinc-700 disabled:opacity-30 text-zinc-300 transition shrink-0"
+                    aria-label={`One fewer conceded by ${k.name}`}
+                  >
+                    <Minus size={13} />
+                  </button>
+                  <span className={`w-6 text-center text-base font-bold tabular-nums ${clean ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {v}
+                  </span>
+                  <button
+                    onClick={() => bumpConceded(k.id, 1)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-700/50 hover:bg-rose-500/20 text-zinc-300 hover:text-rose-400 transition shrink-0"
+                    aria-label={`One more conceded by ${k.name}`}
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <button
         onClick={handleSave}

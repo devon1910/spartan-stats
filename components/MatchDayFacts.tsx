@@ -36,7 +36,7 @@ export default function MatchDayFacts({ filter, scopeLabel, monthStart, monthEnd
     try {
       let statsQ = supabase
         .from('stats')
-        .select('goals, assists, players(name), sessions(session_date)');
+        .select('goals, assists, players(name, is_goalkeeper), sessions(session_date)');
       let eventsQ = supabase
         .from('goal_events')
         .select('scorer:scorer_id(name), assister:assister_id(name), session:session_id(session_date)');
@@ -49,6 +49,7 @@ export default function MatchDayFacts({ filter, scopeLabel, monthStart, monthEnd
       const [statsRes, eventsRes] = await Promise.all([statsQ, eventsQ]);
 
       const stats: StatRow[] = ((statsRes.data ?? []) as any[])
+        .filter((r) => !r.players?.is_goalkeeper)
         .map((r) => ({
           name: r.players?.name,
           date: r.sessions?.session_date,

@@ -7,6 +7,7 @@ import { Share2, Loader2 } from 'lucide-react';
 import FormGuide from '@/components/FormGuide';
 import MonthlyMVPCard from '@/components/MonthlyMVPCard';
 import MatchDayFacts from '@/components/MatchDayFacts';
+import GoalkeepersCard from '@/components/GoalkeepersCard';
 
 interface PlayerStat {
   id: string;
@@ -32,7 +33,7 @@ export default function Leaderboard() {
 
   async function fetchStats() {
     setLoading(true);
-    let query = supabase.from('stats').select('goals, assists, players(id, name), sessions(session_date)');
+    let query = supabase.from('stats').select('goals, assists, players(id, name, is_goalkeeper), sessions(session_date)');
 
     if (filter === 'month') {
       const now = new Date();
@@ -49,9 +50,10 @@ export default function Leaderboard() {
       return;
     }
 
-    type Row = { goals: number; assists: number; players: { id: string; name: string } | null; sessions: { session_date: string } | null };
+    type Row = { goals: number; assists: number; players: { id: string; name: string; is_goalkeeper?: boolean } | null; sessions: { session_date: string } | null };
+    // Keepers have their own card; keep them out of the outfield leaderboard.
     const valid = (rows as unknown as Row[]).filter(
-      (r) => r.players?.id && r.players?.name && r.sessions?.session_date
+      (r) => r.players?.id && r.players?.name && r.sessions?.session_date && !r.players?.is_goalkeeper
     );
 
     // latest up-to-5 session dates across the whole dataset — shared across rows so
@@ -261,6 +263,24 @@ export default function Leaderboard() {
             <Share2 size={15} />
             {copied ? 'Copied! Paste into WhatsApp' : 'Share to WhatsApp'}
           </button>
+
+          <div className="mt-4">
+            {(() => {
+              const now = new Date();
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+              const scopeLabel = filter === 'month'
+                ? now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+                : 'All Time';
+              return (
+                <GoalkeepersCard
+                  scopeLabel={scopeLabel}
+                  monthStart={filter === 'month' ? monthStart : null}
+                  monthEnd={filter === 'month' ? monthEnd : null}
+                />
+              );
+            })()}
+          </div>
 
           <div className="mt-2">
             {(() => {

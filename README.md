@@ -10,6 +10,7 @@ Mobile-first stats tracker for the weekly Tuesday football kickabout. Log goals 
 - **Leaderboard** — monthly / all-time toggle, podium for the top 3, last-5 form-guide chips
 - **Monthly MVP card** — auto-generated with sub-awards: Top Scorer, Playmaker, Iron Man, Most Improved
 - **Player profiles** — career totals, attendance %, best month, longest scoring streak, top chemistry partner
+- **Goalkeepers** — fixed keepers get their own stat line: goals conceded per match day & month, clean sheets, goals-against average, longest clean-sheet run, plus a "Between the Sticks" leaderboard card crowning the monthly **Golden Glove**
 - **Match Day Facts** — rule-based insights like "X has scored in 3 consecutive sessions" or "Y → Z is the top duo"
 - **WhatsApp-ready sharing** — copy a formatted leaderboard, MVP card, or single fact straight to the clipboard
 
