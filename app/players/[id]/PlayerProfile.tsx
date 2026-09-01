@@ -25,11 +25,11 @@ export default function PlayerProfile({ playerId }: { playerId: string }) {
 
     const { data: playerRow } = await supabase
       .from('players')
-      .select('name, is_goalkeeper')
+      .select('name, is_goalkeeper, is_system')
       .eq('id', playerId)
       .maybeSingle();
 
-    if (!playerRow) {
+    if (!playerRow || (playerRow as any).is_system) {
       setName('');
       setLoading(false);
       return;
@@ -63,7 +63,7 @@ export default function PlayerProfile({ playerId }: { playerId: string }) {
 
     const { data: events } = await supabase
       .from('goal_events')
-      .select('scorer:scorer_id(id, name), assister:assister_id(id, name)')
+      .select('scorer:scorer_id(id, name, is_system), assister:assister_id(id, name, is_system)')
       .or(`scorer_id.eq.${playerId},assister_id.eq.${playerId}`);
 
     const pairCounts: Record<string, number> = {};
@@ -71,6 +71,7 @@ export default function PlayerProfile({ playerId }: { playerId: string }) {
       const scorerId = e.scorer?.id;
       const assisterId = e.assister?.id;
       if (!scorerId || !assisterId) continue;
+      if (e.scorer?.is_system || e.assister?.is_system) continue;
       if (scorerId !== playerId && assisterId !== playerId) continue;
       const other = scorerId === playerId ? e.assister?.name : e.scorer?.name;
       if (!other) continue;

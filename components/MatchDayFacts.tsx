@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Newspaper, X, Copy, Check, Loader2 } from 'lucide-react';
 
 interface Props {
-  filter: 'month' | 'alltime';
+  filter: 'month' | 'lastmonth' | 'alltime';
   scopeLabel: string;
   monthStart: string | null;
   monthEnd: string | null;
@@ -14,7 +14,13 @@ interface Props {
 interface Fact { id: string; text: string }
 
 interface StatRow { name: string; date: string; goals: number; assists: number }
-interface EventRow { scorer: string | null; assister: string | null; date: string }
+interface EventRow {
+  scorer: string | null;
+  assister: string | null;
+  scorerIsSystem: boolean;
+  assisterIsSystem: boolean;
+  date: string;
+}
 
 export default function MatchDayFacts({ filter, scopeLabel, monthStart, monthEnd }: Props) {
   const [open, setOpen] = useState(false);
@@ -36,12 +42,12 @@ export default function MatchDayFacts({ filter, scopeLabel, monthStart, monthEnd
     try {
       let statsQ = supabase
         .from('stats')
-        .select('goals, assists, players(name, is_goalkeeper), sessions(session_date)');
+        .select('goals, assists, players(name, is_goalkeeper, is_system), sessions(session_date)');
       let eventsQ = supabase
         .from('goal_events')
-        .select('scorer:scorer_id(name), assister:assister_id(name), session:session_id(session_date)');
+        .select('scorer:scorer_id(name, is_system), assister:assister_id(name, is_system), session:session_id(session_date)');
 
-      if (filter === 'month' && monthStart && monthEnd) {
+      if (filter !== 'alltime' && monthStart && monthEnd) {
         statsQ = statsQ.gte('sessions.session_date', monthStart).lte('sessions.session_date', monthEnd);
         eventsQ = eventsQ.gte('session.session_date', monthStart).lte('session.session_date', monthEnd);
       }
@@ -49,7 +55,7 @@ export default function MatchDayFacts({ filter, scopeLabel, monthStart, monthEnd
       const [statsRes, eventsRes] = await Promise.all([statsQ, eventsQ]);
 
       const stats: StatRow[] = ((statsRes.data ?? []) as any[])
-        .filter((r) => !r.players?.is_goalkeeper)
+        .filter((r) => !r.players?.is_goalkeeper && !r.players?.is_system)
         .map((r) => ({
           name: r.players?.name,
           date: r.sessions?.session_date,
@@ -62,6 +68,8 @@ export default function MatchDayFacts({ filter, scopeLabel, monthStart, monthEnd
         .map((r) => ({
           scorer: r.scorer?.name ?? null,
           assister: r.assister?.name ?? null,
+          scorerIsSystem: Boolean(r.scorer?.is_system),
+          assisterIsSystem: Boolean(r.assister?.is_system),
           date: r.session?.session_date,
         }))
         .filter((r) => r.date);
@@ -287,7 +295,7 @@ function computeFacts(stats: StatRow[], events: EventRow[]): Fact[] {
 
   const pairs: Record<string, number> = {};
   for (const e of events) {
-    if (!e.scorer || !e.assister) continue;
+    if (!e.scorer || !e.assister || e.scorerIsSystem || e.assisterIsSystem) continue;
     const key = `${e.assister} → ${e.scorer}`;
     pairs[key] = (pairs[key] ?? 0) + 1;
   }

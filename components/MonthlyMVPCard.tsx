@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Target, Sparkles, CalendarCheck, TrendingUp, Share2 } from 'lucide-react';
+import { getPreviousMonthPeriod } from '@/lib/datePeriods';
 
 interface PlayerStat {
   id: string;
@@ -27,20 +28,18 @@ export default function MonthlyMVPCard({ current, monthLabel, monthStart }: Prop
   }, [monthStart]);
 
   async function fetchPrev() {
-    const d = new Date(monthStart + 'T00:00:00');
-    const prevStart = new Date(d.getFullYear(), d.getMonth() - 1, 1).toISOString().split('T')[0];
-    const prevEnd = new Date(d.getFullYear(), d.getMonth(), 0).toISOString().split('T')[0];
+    const previous = getPreviousMonthPeriod(monthStart);
     const { data: rows } = await supabase
       .from('stats')
-      .select('goals, assists, players(name), sessions(session_date)')
-      .gte('sessions.session_date', prevStart)
-      .lte('sessions.session_date', prevEnd);
+      .select('goals, assists, players(name, is_goalkeeper, is_system), sessions(session_date)')
+      .gte('sessions.session_date', previous.start)
+      .lte('sessions.session_date', previous.end);
 
     const m: Record<string, number> = {};
     for (const r of (rows ?? []) as any[]) {
       const name = r.players?.name;
       const date = r.sessions?.session_date;
-      if (!name || !date) continue;
+      if (!name || !date || r.players?.is_goalkeeper || r.players?.is_system) continue;
       m[name] = (m[name] ?? 0) + r.goals + r.assists;
     }
     setPrevByName(m);

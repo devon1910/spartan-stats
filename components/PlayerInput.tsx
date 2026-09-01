@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Users, Pencil, CheckCircle, RefreshCw } from 'lucide-react';
+import { isSystemPlayerName } from '@/lib/systemPlayers';
 
 interface PlayerInputProps {
   initialPlayers?: string[];
@@ -22,7 +23,9 @@ export default function PlayerInput({ initialPlayers = [], onConfirm }: PlayerIn
   function parsePlayers(input: string): string[] {
     const cleaned = input.replace(INVISIBLE_CHARS, '');
     const matches = [...cleaned.matchAll(/^\d+\.\s*(.+)$/gm)];
-    return matches.map((m) => m[1].trim()).filter(Boolean);
+    return matches
+      .map((m) => m[1].trim())
+      .filter((name) => name && !isSystemPlayerName(name));
   }
 
   const parsed = parsePlayers(text);

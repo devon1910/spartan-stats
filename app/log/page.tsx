@@ -37,7 +37,7 @@ export default function LogPage() {
       if (sessionData) {
         const { data: statsRows, error: statsError } = await supabase
           .from('stats')
-          .select('players(name, is_goalkeeper)')
+          .select('players(name, is_goalkeeper, is_system)')
           .eq('session_id', sessionData.id);
 
         if (statsError) throw statsError;
@@ -47,7 +47,7 @@ export default function LogPage() {
           // outfield roster — keep them out of the player list.
           const names = statsRows
             .map((r: any) => r.players)
-            .filter((p: any) => p?.name && !p.is_goalkeeper)
+            .filter((p: any) => p?.name && !p.is_goalkeeper && !p.is_system)
             .map((p: any) => p.name) as string[];
           setPlayers(names);
         }

@@ -8,6 +8,7 @@ import FormGuide from '@/components/FormGuide';
 import MonthlyMVPCard from '@/components/MonthlyMVPCard';
 import MatchDayFacts from '@/components/MatchDayFacts';
 import GoalkeepersCard from '@/components/GoalkeepersCard';
+import { getMonthPeriod } from '@/lib/datePeriods';
 
 interface PlayerStat {
   id: string;
@@ -21,9 +22,10 @@ interface PlayerStat {
 }
 
 const RANK_ICONS = ['🥇', '🥈', '🥉'];
+type LeaderboardFilter = 'month' | 'lastmonth' | 'alltime';
 
 export default function Leaderboard() {
-  const [filter, setFilter] = useState<'month' | 'alltime'>('month');
+  const [filter, setFilter] = useState<LeaderboardFilter>('month');
   const [data, setData] = useState<PlayerStat[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,13 +35,13 @@ export default function Leaderboard() {
 
   async function fetchStats() {
     setLoading(true);
-    let query = supabase.from('stats').select('goals, assists, players(id, name, is_goalkeeper), sessions(session_date)');
+    let query = supabase
+      .from('stats')
+      .select('goals, assists, players(id, name, is_goalkeeper, is_system), sessions(session_date)');
 
-    if (filter === 'month') {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-      query = query.gte('sessions.session_date', start).lte('sessions.session_date', end);
+    if (filter !== 'alltime') {
+      const period = getMonthPeriod(filter === 'lastmonth' ? -1 : 0);
+      query = query.gte('sessions.session_date', period.start).lte('sessions.session_date', period.end);
     }
 
     const { data: rows } = await query;
@@ -50,10 +52,10 @@ export default function Leaderboard() {
       return;
     }
 
-    type Row = { goals: number; assists: number; players: { id: string; name: string; is_goalkeeper?: boolean } | null; sessions: { session_date: string } | null };
-    // Keepers have their own card; keep them out of the outfield leaderboard.
+    type Row = { goals: number; assists: number; players: { id: string; name: string; is_goalkeeper?: boolean; is_system?: boolean } | null; sessions: { session_date: string } | null };
+    // Keepers have their own card, while system players are bookkeeping only.
     const valid = (rows as unknown as Row[]).filter(
-      (r) => r.players?.id && r.players?.name && r.sessions?.session_date && !r.players?.is_goalkeeper
+      (r) => r.players?.id && r.players?.name && r.sessions?.session_date && !r.players?.is_goalkeeper && !r.players?.is_system
     );
 
     // latest up-to-5 session dates across the whole dataset — shared across rows so
@@ -98,10 +100,9 @@ export default function Leaderboard() {
   const [copied, setCopied] = useState(false);
 
   function buildShareText() {
-    const now = new Date();
-    const period = filter === 'month'
-      ? now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-      : 'All Time';
+    const period = filter === 'alltime'
+      ? 'All Time'
+      : getMonthPeriod(filter === 'lastmonth' ? -1 : 0).label;
     const totalGoals = data.reduce((s, p) => s + p.goals, 0);
     const totalAssists = data.reduce((s, p) => s + p.assists, 0);
 
@@ -148,7 +149,7 @@ export default function Leaderboard() {
   return (
     <div>
       <div className="flex gap-2 mb-5">
-        {(['month', 'alltime'] as const).map((f) => (
+        {(['month', 'lastmonth', 'alltime'] as const).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
@@ -158,7 +159,7 @@ export default function Leaderboard() {
                 : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300 border border-zinc-800'
             }`}
           >
-            {f === 'month' ? 'This Month' : 'All Time'}
+            {f === 'month' ? 'This Month' : f === 'lastmonth' ? 'Last Month' : 'All Time'}
           </button>
         ))}
       </div>
@@ -172,11 +173,9 @@ export default function Leaderboard() {
         <p className="text-zinc-600 text-center py-16 text-sm">No stats logged yet for this period.</p>
       ) : (
         <>
-          {filter === 'month' && (() => {
-            const now = new Date();
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-            const monthLabel = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-            return <MonthlyMVPCard current={data} monthLabel={monthLabel} monthStart={monthStart} />;
+          {filter !== 'alltime' && (() => {
+            const period = getMonthPeriod(filter === 'lastmonth' ? -1 : 0);
+            return <MonthlyMVPCard current={data} monthLabel={period.label} monthStart={period.start} />;
           })()}
 
           {data.length >= 3 && (
@@ -266,17 +265,13 @@ export default function Leaderboard() {
 
           <div className="mt-4">
             {(() => {
-              const now = new Date();
-              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-              const scopeLabel = filter === 'month'
-                ? now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-                : 'All Time';
+              const period = getMonthPeriod(filter === 'lastmonth' ? -1 : 0);
+              const scopeLabel = filter === 'alltime' ? 'All Time' : period.label;
               return (
                 <GoalkeepersCard
                   scopeLabel={scopeLabel}
-                  monthStart={filter === 'month' ? monthStart : null}
-                  monthEnd={filter === 'month' ? monthEnd : null}
+                  monthStart={filter === 'alltime' ? null : period.start}
+                  monthEnd={filter === 'alltime' ? null : period.end}
                 />
               );
             })()}
@@ -284,18 +279,14 @@ export default function Leaderboard() {
 
           <div className="mt-2">
             {(() => {
-              const now = new Date();
-              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-              const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-              const scopeLabel = filter === 'month'
-                ? now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-                : 'All Time';
+              const period = getMonthPeriod(filter === 'lastmonth' ? -1 : 0);
+              const scopeLabel = filter === 'alltime' ? 'All Time' : period.label;
               return (
                 <MatchDayFacts
                   filter={filter}
                   scopeLabel={scopeLabel}
-                  monthStart={filter === 'month' ? monthStart : null}
-                  monthEnd={filter === 'month' ? monthEnd : null}
+                  monthStart={filter === 'alltime' ? null : period.start}
+                  monthEnd={filter === 'alltime' ? null : period.end}
                 />
               );
             })()}

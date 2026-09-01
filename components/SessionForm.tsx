@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/lib/useToast';
 import Toast from '@/components/Toast';
 import { BarChart2, Save, Plus, X, AlertTriangle, Minus } from 'lucide-react';
+import { isSystemPlayerName, OWN_GOAL_NAME } from '@/lib/systemPlayers';
 
 interface SessionFormProps {
   players: string[];
@@ -32,6 +33,14 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
   const [conceded, setConceded] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const { toast, showToast } = useToast();
+  const rosterPlayers = useMemo(
+    () => players.filter((name) => !isSystemPlayerName(name)),
+    [players]
+  );
+  const scorerOptions = useMemo(
+    () => [...rosterPlayers, OWN_GOAL_NAME],
+    [rosterPlayers]
+  );
 
   // Keepers are fixed, so fetch them once — independent of the outfield roster.
   useEffect(() => {
@@ -98,19 +107,20 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
 
   const totals = useMemo(() => {
     const t: Record<string, { goals: number; assists: number }> = {};
-    for (const p of players) t[p] = { goals: 0, assists: 0 };
+    for (const p of rosterPlayers) t[p] = { goals: 0, assists: 0 };
     for (const g of goals) {
       if (t[g.scorer]) t[g.scorer].goals++;
       if (g.assister && t[g.assister]) t[g.assister].assists++;
     }
     return t;
-  }, [goals, players]);
+  }, [goals, rosterPlayers]);
 
   const totalGoals = goals.length;
   const totalAssists = goals.filter((g) => g.assister).length;
 
   function addGoal() {
-    setGoals((prev) => [...prev, { scorer: players[0], assister: null }]);
+    if (!rosterPlayers[0]) return;
+    setGoals((prev) => [...prev, { scorer: rosterPlayers[0], assister: null }]);
   }
 
   function updateGoal(index: number, patch: Partial<GoalEntry>) {
@@ -138,8 +148,10 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
   async function handleSave() {
     setSaving(true);
     try {
-      for (const name of players) {
-        await supabase.from('players').upsert({ name }, { onConflict: 'name' });
+      for (const name of scorerOptions) {
+        const player = isSystemPlayerName(name) ? { name: OWN_GOAL_NAME, is_system: true } : { name };
+        const { error } = await supabase.from('players').upsert(player, { onConflict: 'name' });
+        if (error) throw error;
       }
 
       const { data: sessionData, error: sessionError } = await supabase
@@ -153,7 +165,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
       const { data: playerRows } = await supabase
         .from('players')
         .select('id, name')
-        .in('name', players);
+        .in('name', scorerOptions);
 
       if (!playerRows) throw new Error('Failed to fetch players');
 
@@ -184,7 +196,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
       }
 
       // Derive stats from the full goal_events set (managed + preserved legacy)
-      // and upsert only for players in the current roster — orphan stats rows
+      // and upsert only for players managed by this form — orphan stats rows
       // belonging to players the user removed from the roster are left alone.
       const { data: allEvents } = await supabase
         .from('goal_events')
@@ -201,7 +213,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
         }
       }
 
-      for (const name of players) {
+      for (const name of scorerOptions) {
         const playerId = playerMap[name];
         if (!playerId) continue;
         const t = derivedByPlayerId[playerId] ?? { goals: 0, assists: 0 };
@@ -263,7 +275,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
       <div className="mb-4">
         <p className="text-zinc-600 text-[11px] font-medium mb-2 px-1">Totals</p>
         <div className="flex flex-wrap gap-1.5">
-          {players.map((name) => {
+          {rosterPlayers.map((name) => {
             const t = totals[name] ?? { goals: 0, assists: 0 };
             const active = t.goals + t.assists > 0;
             return (
@@ -288,6 +300,9 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
           Goals {totalGoals > 0 && <span className="text-zinc-500">({totalGoals} · {totalAssists} assisted)</span>}
         </p>
       </div>
+      <p className="text-zinc-600 text-[10px] mb-2 px-1">
+        Own goal? Select <span className="text-zinc-400">Own Goal</span> as scorer, then credit the player who forced it.
+      </p>
 
       {goals.length === 0 ? (
         <div className="bg-zinc-800/50 border border-dashed border-zinc-700 rounded-xl py-6 text-center text-zinc-600 text-xs mb-3">
@@ -306,8 +321,8 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
                 onChange={(e) => updateGoal(i, { scorer: e.target.value })}
                 className="flex-1 min-w-0 bg-zinc-900 text-white text-sm font-medium rounded-lg px-2 py-1.5 border border-zinc-700 focus:border-rose-500 focus:outline-none"
               >
-                {players.map((p) => (
-                  <option key={p} value={p}>{p}</option>
+                {scorerOptions.map((p) => (
+                  <option key={p} value={p}>{isSystemPlayerName(p) ? 'Own Goal' : p}</option>
                 ))}
               </select>
 
@@ -320,7 +335,7 @@ export default function SessionForm({ players, sessionDate, onSave }: SessionFor
                 className="flex-1 min-w-0 bg-zinc-900 text-zinc-300 text-sm rounded-lg px-2 py-1.5 border border-zinc-700 focus:border-rose-500 focus:outline-none"
               >
                 <option value={NONE}>—</option>
-                {players
+                {rosterPlayers
                   .filter((p) => p !== g.scorer)
                   .map((p) => (
                     <option key={p} value={p}>{p}</option>

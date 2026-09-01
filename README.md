@@ -6,8 +6,8 @@ Mobile-first stats tracker for the weekly Tuesday football kickabout. Log goals 
 
 ## Features
 
-- **Goal-by-goal logging** — capture each goal with optional assister; per-player totals derive automatically
-- **Leaderboard** — monthly / all-time toggle, podium for the top 3, last-5 form-guide chips
+- **Goal-by-goal logging** — capture each goal with optional assister, including forced own goals; per-player totals derive automatically
+- **Leaderboard** — this-month / last-month / all-time toggle, podium for the top 3, last-5 form-guide chips
 - **Monthly MVP card** — auto-generated with sub-awards: Top Scorer, Playmaker, Iron Man, Most Improved
 - **Player profiles** — career totals, attendance %, best month, longest scoring streak, top chemistry partner
 - **Goalkeepers** — fixed keepers get their own stat line: goals conceded per match day & month, clean sheets, goals-against average, longest clean-sheet run, plus a "Between the Sticks" leaderboard card crowning the monthly **Golden Glove**
@@ -65,7 +65,7 @@ CREATE TABLE stats (
 );
 ```
 
-Then apply the versioned `goal_events` migration — either via the Supabase CLI:
+Then apply the versioned migrations — either via the Supabase CLI:
 
 ```bash
 supabase db push --db-url "<session-pooler-uri>"
@@ -95,7 +95,7 @@ app/
   players/[id]/         player profile (dynamic route)
 components/
   SessionForm           goal-by-goal logging UI
-  Leaderboard           monthly / all-time table, podium, form chips
+  Leaderboard           this-month / last-month / all-time table, podium, form chips
   MonthlyMVPCard        hero card with monthly sub-awards
   MatchDayFacts         auto-derived insights panel
   FormGuide             last-5 chips, reused on leaderboard + profile
