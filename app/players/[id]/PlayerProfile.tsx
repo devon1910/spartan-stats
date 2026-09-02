@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { Loader2, ArrowLeft, Trophy, Users, Shield, ShieldCheck, Hand } from 'lucide-react';
 import FormGuide from '@/components/FormGuide';
+import { getMonthPeriod } from '@/lib/datePeriods';
 
 interface StatRow { goals: number; assists: number; conceded: number; session_date: string }
 
@@ -48,9 +49,7 @@ export default function PlayerProfile({ playerId }: { playerId: string }) {
       .sort((a, b) => (a.session_date < b.session_date ? 1 : -1));
     setAllStats(stats);
 
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const currentMonth = getMonthPeriod();
 
     const { count: countAll } = await supabase
       .from('sessions').select('id', { count: 'exact', head: true });
@@ -58,7 +57,7 @@ export default function PlayerProfile({ playerId }: { playerId: string }) {
 
     const { count: countMonth } = await supabase
       .from('sessions').select('id', { count: 'exact', head: true })
-      .gte('session_date', monthStart).lte('session_date', monthEnd);
+      .gte('session_date', currentMonth.start).lte('session_date', currentMonth.end);
     setTotalSessionsMonth(countMonth ?? 0);
 
     const { data: events } = await supabase
@@ -84,11 +83,8 @@ export default function PlayerProfile({ playerId }: { playerId: string }) {
   }
 
   const monthBounds = useMemo(() => {
-    const now = new Date();
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
-      end: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0],
-    };
+    const currentMonth = getMonthPeriod();
+    return { start: currentMonth.start, end: currentMonth.end };
   }, []);
 
   const scopedStats = scope === 'month'

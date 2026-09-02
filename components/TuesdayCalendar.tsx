@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { getMonthPeriod, toLocalIsoDate } from '@/lib/datePeriods';
 
 interface TuesdayCalendarProps {
   onSelectDate: (date: string) => void;
@@ -21,16 +22,13 @@ export default function TuesdayCalendar({ onSelectDate, selectedDate }: TuesdayC
   }, [currentMonth]);
 
   async function fetchSessions() {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const start = new Date(year, month, 1).toISOString().split('T')[0];
-    const end = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const period = getMonthPeriod(0, currentMonth);
 
     const { data } = await supabase
       .from('sessions')
       .select('session_date')
-      .gte('session_date', start)
-      .lte('session_date', end);
+      .gte('session_date', period.start)
+      .lte('session_date', period.end);
 
     if (data) setExistingSessions(data.map((s) => s.session_date));
   }
@@ -49,7 +47,7 @@ export default function TuesdayCalendar({ onSelectDate, selectedDate }: TuesdayC
   }
 
   function formatDate(d: Date): string {
-    return d.toISOString().split('T')[0];
+    return toLocalIsoDate(d);
   }
 
   const tuesdays = getTuesdays();
